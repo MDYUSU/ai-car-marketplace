@@ -13,6 +13,7 @@ import {
   Eye,
   Loader2,
   Car as CarIcon,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -269,6 +270,12 @@ export const CarsList = () => {
                             >
                               <Eye className="mr-2 h-4 w-4" />
                               View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => router.push(`/admin/cars/${car.id}/edit`)}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Status</DropdownMenuLabel>

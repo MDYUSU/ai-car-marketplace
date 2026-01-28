@@ -5,11 +5,18 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+import { Info, ArrowUpDown } from "lucide-react";
 import { CarCard } from "@/components/car-card";
 import useFetch from "@/hooks/use-fetch";
 import { getCars } from "@/actions/car-listing";
 import CarListingsLoading from "./car-listing-loading";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import {
   Pagination,
@@ -30,6 +37,7 @@ export function CarListings() {
   // Extract filter values from searchParams
   const search = searchParams.get("search") || "";
   const make = searchParams.get("make") || "";
+  const model = searchParams.get("model") || "";
   const bodyType = searchParams.get("bodyType") || "";
   const fuelType = searchParams.get("fuelType") || "";
   const transmission = searchParams.get("transmission") || "";
@@ -46,6 +54,7 @@ export function CarListings() {
     fetchCars({
       search,
       make,
+      model,
       bodyType,
       fuelType,
       transmission,
@@ -58,6 +67,7 @@ export function CarListings() {
   }, [
     search,
     make,
+    model,
     bodyType,
     fuelType,
     transmission,
@@ -75,6 +85,14 @@ export function CarListings() {
       router.push(`?${params.toString()}`);
     }
   }, [currentPage, router, searchParams, page]);
+
+  // Handle sort change
+  const handleSortChange = (value) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("sortBy", value);
+    params.set("page", "1"); // Reset to first page when sorting
+    router.push(`?${params.toString()}`);
+  };
 
   // Handle pagination clicks
   const handlePageChange = (pageNum) => {
@@ -192,7 +210,7 @@ export function CarListings() {
 
   return (
     <div>
-      {/* Results count and current page */}
+      {/* Results count and sort */}
       <div className="flex justify-between items-center mb-6">
         <p className="text-gray-600">
           Showing{" "}
@@ -201,6 +219,21 @@ export function CarListings() {
           </span>{" "}
           of <span className="font-medium">{pagination.total}</span> cars
         </p>
+        
+        <div className="flex items-center gap-2">
+          <ArrowUpDown className="h-4 w-4 text-gray-500" />
+          <Select value={sortBy} onValueChange={handleSortChange}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest First</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="priceAsc">Price: Low → High</SelectItem>
+              <SelectItem value="priceDesc">Price: High → Low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Car grid */}

@@ -5,7 +5,6 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -33,13 +32,13 @@ model Car {
   model             String
   year              Int
   price             Decimal            @db.Decimal(10, 2)
-  mileage           Int
+  mileage           Int?
   color             String
   fuelType          String
   transmission      String
   bodyType          String
   seats             Int?
-  description       String
+  description       String?
   status            CarStatus          @default(AVAILABLE)
   featured          Boolean            @default(false)
   images            String[]           // Array of Supabase storage URLs

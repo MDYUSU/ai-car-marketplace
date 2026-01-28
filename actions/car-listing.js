@@ -77,6 +77,7 @@ export async function getCarFilters() {
 export async function getCars({
   search = "",
   make = "",
+  model = "",
   bodyType = "",
   fuelType = "",
   transmission = "",
@@ -87,6 +88,8 @@ export async function getCars({
   limit = 6,
 }) {
   try {
+    console.log("🚗 getCars called with:", { search, make, model, bodyType, fuelType, transmission, minPrice, maxPrice, sortBy, page, limit });
+    
     // Get current user if authenticated
     const { userId } = await auth();
     let dbUser = null;
@@ -111,10 +114,13 @@ export async function getCars({
     }
 
     if (make) where.make = { equals: make, mode: "insensitive" };
+    if (model) where.model = { equals: model, mode: "insensitive" };
     if (bodyType) where.bodyType = { equals: bodyType, mode: "insensitive" };
     if (fuelType) where.fuelType = { equals: fuelType, mode: "insensitive" };
     if (transmission)
       where.transmission = { equals: transmission, mode: "insensitive" };
+
+    console.log("🔍 Final where clause:", where);
 
     // Add price range
     where.price = {
@@ -136,6 +142,9 @@ export async function getCars({
         break;
       case "priceDesc":
         orderBy = { price: "desc" };
+        break;
+      case "oldest":
+        orderBy = { createdAt: "asc" };
         break;
       case "newest":
       default:

@@ -7,8 +7,8 @@ import { Toaster } from "sonner";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Vehiqle",
-  description: "Find your Dream Car",
+  title: "Vehiql – Car Marketplace",
+  description: "Search, filter and book test drives instantly",
 };
 
 export default function RootLayout({ children }) {
@@ -25,7 +25,7 @@ export default function RootLayout({ children }) {
 
           <footer className="bg-blue-50 py-12">
             <div className="container mx-auto px-4 text-center text-gray-600">
-              <p>Made with 💗 by RoadsideCoder</p>
+              <p>© 2026 Vehiql. All rights reserved.</p>
             </div>
           </footer>
         </body>

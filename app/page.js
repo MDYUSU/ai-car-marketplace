@@ -24,10 +24,10 @@ export default async function Home() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="mb-8">
             <h1 className="text-5xl md:text-8xl mb-4 gradient-title">
-              Find your Dream Car with Vehiql AI
+              Find Your Perfect Car Today
             </h1>
             <p className="text-xl text-gray-500 mb-8 max-w-2xl mx-auto">
-              Advanced AI Car Search and test drive from thousands of vehicles.
+              Search, filter and book test drives instantly
             </p>
           </div>
 
@@ -190,7 +190,7 @@ export default async function Home() {
       <section className="py-16 dotted-background text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">
-            Ready to Find Your Dream Car?
+            Ready to Find Your Perfect Car?
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Join thousands of satisfied customers who found their perfect

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { addCar } from "@/actions/cars";
+import { getCarById, updateCar } from "@/actions/cars";
 import useFetch from "@/hooks/use-fetch";
 import Image from "next/image";
 
@@ -67,12 +67,12 @@ const carFormSchema = z.object({
   // Images are handled separately
 });
 
-export const AddCarForm = () => {
+export const EditCarForm = ({ carId }) => {
   const router = useRouter();
   const [uploadedImages, setUploadedImages] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [imageError, setImageError] = useState("");
-  const [addCarLoading, setAddCarLoading] = useState(false);
+  const [updateCarLoading, setUpdateCarLoading] = useState(false);
 
   // Initialize form with react-hook-form and zod
   const {
@@ -82,6 +82,7 @@ export const AddCarForm = () => {
     formState: { errors },
     handleSubmit,
     watch,
+    reset,
   } = useForm({
     resolver: zodResolver(carFormSchema),
     defaultValues: {
@@ -100,6 +101,51 @@ export const AddCarForm = () => {
       featured: false,
     },
   });
+
+  // Fetch car data and populate form
+  const {
+    loading: loadingCar,
+    fn: fetchCar,
+    data: carData,
+    error: carError,
+  } = useFetch(getCarById);
+
+  useEffect(() => {
+    fetchCar(carId);
+  }, [carId]);
+
+  useEffect(() => {
+    if (carData?.success && carData.data) {
+      const car = carData.data;
+      
+      // Populate form fields
+      reset({
+        make: car.make || "",
+        model: car.model || "",
+        year: car.year?.toString() || "",
+        price: car.price?.toString() || "",
+        mileage: car.mileage?.toString() || "",
+        color: car.color || "",
+        fuelType: car.fuelType || "",
+        transmission: car.transmission || "",
+        bodyType: car.bodyType || "",
+        seats: car.seats?.toString() || "",
+        description: car.description || "",
+        status: car.status || "AVAILABLE",
+        featured: car.featured || false,
+      });
+
+      // Set existing images
+      setUploadedImages(car.images || []);
+    }
+  }, [carData, reset]);
+
+  useEffect(() => {
+    if (carError) {
+      toast.error("Failed to load car data");
+      router.push("/admin/cars");
+    }
+  }, [carError, router]);
 
   // Handle multiple image uploads with Dropzone
   const onMultiImagesDrop = useCallback(async (acceptedFiles) => {
@@ -187,33 +233,41 @@ export const AddCarForm = () => {
     };
 
     try {
-      setAddCarLoading(true);
+      setUpdateCarLoading(true);
 
-      const result = await addCar({
+      const result = await updateCar(carId, {
         carData,
         images: uploadedImages,
       });
 
       if (result?.success) {
-        toast.success("Car added successfully");
+        toast.success("Car updated successfully");
         router.push("/admin/cars");
       } else {
-        toast.error(result?.error || "Failed to add car");
+        toast.error(result?.error || "Failed to update car");
       }
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setAddCarLoading(false);
+      setUpdateCarLoading(false);
     }
   };
+
+  if (loadingCar) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6">
       <Card>
         <CardHeader>
-          <CardTitle>Car Details</CardTitle>
+          <CardTitle>Edit Car Details</CardTitle>
           <CardDescription>
-            Enter the details of the car you want to add.
+            Update the details of this car.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -545,19 +599,27 @@ export const AddCarForm = () => {
             </div>
 
             {/* Submit Button */}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/admin/cars")}
+                disabled={updateCarLoading}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 className="w-full sm:w-auto"
-                disabled={addCarLoading}
+                disabled={updateCarLoading}
               >
-                {addCarLoading ? (
+                {updateCarLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding Car...
+                    Updating Car...
                   </>
                 ) : (
-                  "Add Car"
+                  "Update Car"
                 )}
               </Button>
             </div>
