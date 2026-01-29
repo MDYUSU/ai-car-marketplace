@@ -19,11 +19,6 @@ const routes = [
     href: "/admin/cars",
   },
   {
-    label: "Test Drives",
-    icon: Calendar,
-    href: "/admin/test-drives",
-  },
-  {
     label: "Settings",
     icon: Cog,
     href: "/admin/settings",

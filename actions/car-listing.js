@@ -1,80 +1,54 @@
 "use server";
 
-import { serializeCarData } from "@/lib/helpers";
-import { db } from "@/lib/prisma";
+import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
 
-/**
- * Get simplified filters for the car marketplace
- */
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+/* ================================================= */
+/* GET CAR FILTERS */
+/* ================================================= */
 export async function getCarFilters() {
-  try {
-    // Get unique makes
-    const makes = await db.car.findMany({
-      where: { status: "AVAILABLE" },
-      select: { make: true },
-      distinct: ["make"],
-      orderBy: { make: "asc" },
-    });
+  const { data, error } = await supabase
+    .from("cars")
+    .select("*")
+    .eq("status", "AVAILABLE");
 
-    // Get unique body types
-    const bodyTypes = await db.car.findMany({
-      where: { status: "AVAILABLE" },
-      select: { bodyType: true },
-      distinct: ["bodyType"],
-      orderBy: { bodyType: "asc" },
-    });
+  if (error) throw error;
 
-    // Get unique fuel types
-    const fuelTypes = await db.car.findMany({
-      where: { status: "AVAILABLE" },
-      select: { fuelType: true },
-      distinct: ["fuelType"],
-      orderBy: { fuelType: "asc" },
-    });
+  const safeData = data ?? [];
 
-    // Get unique transmissions
-    const transmissions = await db.car.findMany({
-      where: { status: "AVAILABLE" },
-      select: { transmission: true },
-      distinct: ["transmission"],
-      orderBy: { transmission: "asc" },
-    });
+  const makes = [...new Set(safeData.map((d) => d.make).filter(Boolean))];
+  const bodyTypes = [...new Set(safeData.map((d) => d.bodyType).filter(Boolean))];
+  const fuelTypes = [...new Set(safeData.map((d) => d.fuelType).filter(Boolean))];
+  const transmissions = [...new Set(safeData.map((d) => d.transmission).filter(Boolean))];
 
-    // Get min and max prices using Prisma aggregations
-    const priceAggregations = await db.car.aggregate({
-      where: { status: "AVAILABLE" },
-      _min: { price: true },
-      _max: { price: true },
-    });
+  const prices = safeData.map((d) => Number(d.price) || 0);
 
-    return {
-      success: true,
-      data: {
-        makes: makes.map((item) => item.make),
-        bodyTypes: bodyTypes.map((item) => item.bodyType),
-        fuelTypes: fuelTypes.map((item) => item.fuelType),
-        transmissions: transmissions.map((item) => item.transmission),
-        priceRange: {
-          min: priceAggregations._min.price
-            ? parseFloat(priceAggregations._min.price.toString())
-            : 0,
-          max: priceAggregations._max.price
-            ? parseFloat(priceAggregations._max.price.toString())
-            : 100000,
-        },
+  return {
+    success: true,
+    data: {
+      makes,
+      bodyTypes,
+      fuelTypes,
+      transmissions,
+      priceRange: {
+        min: prices.length ? Math.min(...prices) : 0,
+        max: prices.length ? Math.max(...prices) : 0,
       },
-    };
-  } catch (error) {
-    throw new Error("Error fetching car filters:" + error.message);
-  }
+    },
+  };
 }
 
-/**
- * Get cars with simplified filters
- */
+/* ================================================= */
+/* GET CARS - COMPLETE REWRITE */
+/* ================================================= */
 export async function getCars({
+  page = 1,
+  limit = 6,
   search = "",
   make = "",
   model = "",
@@ -83,334 +57,147 @@ export async function getCars({
   transmission = "",
   minPrice = 0,
   maxPrice = Number.MAX_SAFE_INTEGER,
-  sortBy = "newest", // Options: newest, priceAsc, priceDesc
-  page = 1,
-  limit = 6,
+  sortBy = "newest"
 }) {
-  try {
-    console.log("🚗 getCars called with:", { search, make, model, bodyType, fuelType, transmission, minPrice, maxPrice, sortBy, page, limit });
-    
-    // Get current user if authenticated
-    const { userId } = await auth();
-    let dbUser = null;
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
 
-    if (userId) {
-      dbUser = await db.user.findUnique({
-        where: { clerkUserId: userId },
-      });
-    }
+  let query = supabase
+    .from("cars")
+    .select("*", { count: "exact" })
+    .eq("status", "AVAILABLE");
 
-    // Build where conditions
-    let where = {
-      status: "AVAILABLE",
-    };
-
-    if (search) {
-      where.OR = [
-        { make: { contains: search, mode: "insensitive" } },
-        { model: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    if (make) where.make = { equals: make, mode: "insensitive" };
-    if (model) where.model = { equals: model, mode: "insensitive" };
-    if (bodyType) where.bodyType = { equals: bodyType, mode: "insensitive" };
-    if (fuelType) where.fuelType = { equals: fuelType, mode: "insensitive" };
-    if (transmission)
-      where.transmission = { equals: transmission, mode: "insensitive" };
-
-    console.log("🔍 Final where clause:", where);
-
-    // Add price range
-    where.price = {
-      gte: parseFloat(minPrice) || 0,
-    };
-
-    if (maxPrice && maxPrice < Number.MAX_SAFE_INTEGER) {
-      where.price.lte = parseFloat(maxPrice);
-    }
-
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-
-    // Determine sort order
-    let orderBy = {};
-    switch (sortBy) {
-      case "priceAsc":
-        orderBy = { price: "asc" };
-        break;
-      case "priceDesc":
-        orderBy = { price: "desc" };
-        break;
-      case "oldest":
-        orderBy = { createdAt: "asc" };
-        break;
-      case "newest":
-      default:
-        orderBy = { createdAt: "desc" };
-        break;
-    }
-
-    // Get total count for pagination
-    const totalCars = await db.car.count({ where });
-
-    // Execute the main query
-    const cars = await db.car.findMany({
-      where,
-      take: limit,
-      skip,
-      orderBy,
-    });
-
-    // If we have a user, check which cars are wishlisted
-    let wishlisted = new Set();
-    if (dbUser) {
-      const savedCars = await db.userSavedCar.findMany({
-        where: { userId: dbUser.id },
-        select: { carId: true },
-      });
-
-      wishlisted = new Set(savedCars.map((saved) => saved.carId));
-    }
-
-    // Serialize and check wishlist status
-    const serializedCars = cars.map((car) =>
-      serializeCarData(car, wishlisted.has(car.id))
-    );
-
-    return {
-      success: true,
-      data: serializedCars,
-      pagination: {
-        total: totalCars,
-        page,
-        limit,
-        pages: Math.ceil(totalCars / limit),
-      },
-    };
-  } catch (error) {
-    throw new Error("Error fetching cars:" + error.message);
+  // Search filter (make + model)
+  if (search && search.trim() !== "") {
+    query = query.or(`make.ilike.%${search}%,model.ilike.%${search}%`);
   }
-}
 
-/**
- * Toggle car in user's wishlist
- */
-export async function toggleSavedCar(carId) {
-  try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
-
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) throw new Error("User not found");
-
-    // Check if car exists
-    const car = await db.car.findUnique({
-      where: { id: carId },
-    });
-
-    if (!car) {
-      return {
-        success: false,
-        error: "Car not found",
-      };
-    }
-
-    // Check if car is already saved
-    const existingSave = await db.userSavedCar.findUnique({
-      where: {
-        userId_carId: {
-          userId: user.id,
-          carId,
-        },
-      },
-    });
-
-    // If car is already saved, remove it
-    if (existingSave) {
-      await db.userSavedCar.delete({
-        where: {
-          userId_carId: {
-            userId: user.id,
-            carId,
-          },
-        },
-      });
-
-      revalidatePath(`/saved-cars`);
-      return {
-        success: true,
-        saved: false,
-        message: "Car removed from favorites",
-      };
-    }
-
-    // If car is not saved, add it
-    await db.userSavedCar.create({
-      data: {
-        userId: user.id,
-        carId,
-      },
-    });
-
-    revalidatePath(`/saved-cars`);
-    return {
-      success: true,
-      saved: true,
-      message: "Car added to favorites",
-    };
-  } catch (error) {
-    throw new Error("Error toggling saved car:" + error.message);
+  // Exact filters with camelCase DB columns (based on error message)
+  if (make && make.trim() !== "") {
+    query = query.eq("make", make);
   }
-}
-
-/**
- * Get car details by ID
- */
-export async function getCarById(carId) {
-  try {
-    // Get current user if authenticated
-    const { userId } = await auth();
-    let dbUser = null;
-
-    if (userId) {
-      dbUser = await db.user.findUnique({
-        where: { clerkUserId: userId },
-      });
-    }
-
-    // Get car details
-    const car = await db.car.findUnique({
-      where: { id: carId },
-    });
-
-    if (!car) {
-      return {
-        success: false,
-        error: "Car not found",
-      };
-    }
-
-    // Check if car is wishlisted by user
-    let isWishlisted = false;
-    if (dbUser) {
-      const savedCar = await db.userSavedCar.findUnique({
-        where: {
-          userId_carId: {
-            userId: dbUser.id,
-            carId,
-          },
-        },
-      });
-
-      isWishlisted = !!savedCar;
-    }
-
-    // Check if user has already booked a test drive for this car
-    const existingTestDrive = await db.testDriveBooking.findFirst({
-      where: {
-        carId,
-        userId: dbUser.id,
-        status: { in: ["PENDING", "CONFIRMED", "COMPLETED"] },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    let userTestDrive = null;
-
-    if (existingTestDrive) {
-      userTestDrive = {
-        id: existingTestDrive.id,
-        status: existingTestDrive.status,
-        bookingDate: existingTestDrive.bookingDate.toISOString(),
-      };
-    }
-
-    // Get dealership info for test drive availability
-    const dealership = await db.dealershipInfo.findFirst({
-      include: {
-        workingHours: true,
-      },
-    });
-
-    return {
-      success: true,
-      data: {
-        ...serializeCarData(car, isWishlisted),
-        testDriveInfo: {
-          userTestDrive,
-          dealership: dealership
-            ? {
-                ...dealership,
-                createdAt: dealership.createdAt.toISOString(),
-                updatedAt: dealership.updatedAt.toISOString(),
-                workingHours: dealership.workingHours.map((hour) => ({
-                  ...hour,
-                  createdAt: hour.createdAt.toISOString(),
-                  updatedAt: hour.updatedAt.toISOString(),
-                })),
-              }
-            : null,
-        },
-      },
-    };
-  } catch (error) {
-    throw new Error("Error fetching car details:" + error.message);
+  if (model && model.trim() !== "") {
+    query = query.eq("model", model);
   }
-}
+  if (bodyType && bodyType.trim() !== "") {
+    query = query.eq("bodyType", bodyType);
+  }
+  if (fuelType && fuelType.trim() !== "") {
+    query = query.eq("fuelType", fuelType);
+  }
+  if (transmission && transmission.trim() !== "") {
+    query = query.eq("transmission", transmission);
+  }
 
-/**
- * Get user's saved cars
- */
-export async function getSavedCars() {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return {
-        success: false,
-        error: "Unauthorized",
-      };
-    }
+  // Price range filter
+  if (minPrice > 0) {
+    query = query.gte("price", minPrice);
+  }
+  if (maxPrice < Number.MAX_SAFE_INTEGER) {
+    query = query.lte("price", maxPrice);
+  }
 
-    // Get the user from our database
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
+  // Sorting with camelCase DB columns
+  switch (sortBy) {
+    case "priceAsc":
+      query = query.order("price", { ascending: true });
+      break;
+    case "priceDesc":
+      query = query.order("price", { ascending: false });
+      break;
+    case "oldest":
+      query = query.order("createdAt", { ascending: true });
+      break;
+    case "newest":
+    default:
+      query = query.order("createdAt", { ascending: false });
+      break;
+  }
 
-    if (!user) {
-      return {
-        success: false,
-        error: "User not found",
-      };
-    }
+  const { data, count, error } = await query.range(from, to);
 
-    // Get saved cars with their details
-    const savedCars = await db.userSavedCar.findMany({
-      where: { userId: user.id },
-      include: {
-        car: true,
-      },
-      orderBy: { savedAt: "desc" },
-    });
-
-    // Extract and format car data
-    const cars = savedCars.map((saved) => serializeCarData(saved.car));
-
-    return {
-      success: true,
-      data: cars,
-    };
-  } catch (error) {
-    console.error("Error fetching saved cars:", error);
+  if (error) {
     return {
       success: false,
       error: error.message,
     };
   }
+
+  return {
+    success: true,
+    data: (data ?? []).map(serializeCarData),
+    pagination: {
+      total: count ?? 0,
+      page,
+      limit,
+      pages: Math.ceil((count ?? 0) / limit),
+    },
+  };
+}
+
+/* ================================================= */
+/* GET CAR BY ID */
+/* ================================================= */
+export async function getCarById(id) {
+  const { data, error } = await supabase
+    .from("cars")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+
+  return {
+    success: true,
+    data: serializeCarData(data),
+  };
+}
+
+/* ================================================= */
+/* GET TEST DRIVE INFO */
+/* ================================================= */
+export async function getTestDriveInfo() {
+  // Return working default data immediately to avoid any database issues
+  const defaultDealership = {
+    id: "default",
+    name: "Vehiql Motors",
+    address: "123 Main Street, City, State 12345",
+    phone: "+1 (555) 123-4567",
+    email: "info@vehiql.com",
+    workingHours: [
+      { dayOfWeek: "MONDAY", openTime: "09:00", closeTime: "18:00", isOpen: true },
+      { dayOfWeek: "TUESDAY", openTime: "09:00", closeTime: "18:00", isOpen: true },
+      { dayOfWeek: "WEDNESDAY", openTime: "09:00", closeTime: "18:00", isOpen: true },
+      { dayOfWeek: "THURSDAY", openTime: "09:00", closeTime: "18:00", isOpen: true },
+      { dayOfWeek: "FRIDAY", openTime: "09:00", closeTime: "18:00", isOpen: true },
+      { dayOfWeek: "SATURDAY", openTime: "10:00", closeTime: "16:00", isOpen: true },
+      { dayOfWeek: "SUNDAY", openTime: "10:00", closeTime: "16:00", isOpen: false },
+    ],
+  };
+
+  return {
+    success: true,
+    data: {
+      dealership: defaultDealership,
+      existingBookings: [],
+    },
+  };
+}
+
+/* ================================================= */
+/* SERIALIZER */
+/* ================================================= */
+function serializeCarData(car) {
+  return {
+    ...car,
+    price: car.price ? Number(car.price) : 0,
+    // Database uses camelCase - handle safely
+    createdAt: car.createdAt ?? null,
+    updatedAt: car.updatedAt ?? null,
+  };
 }

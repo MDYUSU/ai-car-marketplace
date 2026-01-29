@@ -118,10 +118,10 @@ export const SettingsForm = () => {
       const dealership = settingsData.data;
 
       // Map the working hours
-      if (dealership.workingHours.length > 0) {
+      if (dealership?.workingHours?.length > 0) {
         const mappedHours = DAYS.map((day) => {
           // Find matching working hour
-          const hourData = dealership.workingHours.find(
+          const hourData = dealership?.workingHours?.find(
             (h) => h.dayOfWeek === day.value
           );
 

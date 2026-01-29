@@ -27,7 +27,7 @@ export default async function Home() {
               Find Your Perfect Car Today
             </h1>
             <p className="text-xl text-gray-500 mb-8 max-w-2xl mx-auto">
-              Search, filter and book test drives instantly
+              Search, filter and find your dream car instantly
             </p>
           </div>
 
@@ -48,7 +48,7 @@ export default async function Home() {
             </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredCars.map((car) => (
+            {(featuredCars ?? []).map((car) => (
               <CarCard key={car.id} car={car} />
             ))}
           </div>
@@ -67,7 +67,7 @@ export default async function Home() {
             </Button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {carMakes.map((make) => (
+            {(carMakes ?? []).map((make) => (
               <Link
                 key={make.name}
                 href={`/cars?make=${make.name}`}
@@ -142,7 +142,7 @@ export default async function Home() {
             </Button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {bodyTypes.map((type) => (
+            {(bodyTypes ?? []).map((type) => (
               <Link
                 key={type.name}
                 href={`/cars?bodyType=${type.name}`}
@@ -176,7 +176,7 @@ export default async function Home() {
             Frequently Asked Questions
           </h2>
           <Accordion type="single" collapsible className="w-full">
-            {faqItems.map((faq, index) => (
+            {(faqItems ?? []).map((faq, index) => (
               <AccordionItem key={index} value={`item-${index}`}>
                 <AccordionTrigger>{faq.question}</AccordionTrigger>
                 <AccordionContent>{faq.answer}</AccordionContent>

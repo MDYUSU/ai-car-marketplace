@@ -5,24 +5,21 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@clerk/nextjs";
-import { AlertCircle, Calendar } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import {
   Car,
   Fuel,
   Gauge,
   LocateFixed,
   Share2,
-  Heart,
   MessageSquare,
   Currency,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toggleSavedCar } from "@/actions/car-listing";
 import useFetch from "@/hooks/use-fetch";
 import { formatCurrency } from "@/lib/helpers";
-import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
@@ -33,47 +30,15 @@ import {
 } from "@/components/ui/dialog";
 import EmiCalculator from "./emi-calculator";
 
-export function CarDetails({ car, testDriveInfo }) {
+export function CarDetails({ car }) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isWishlisted, setIsWishlisted] = useState(car.wishlisted);
-
-  const {
-    loading: savingCar,
-    fn: toggleSavedCarFn,
-    data: toggleResult,
-    error: toggleError,
-  } = useFetch(toggleSavedCar);
-
-  // Handle toggle result with useEffect
-  useEffect(() => {
-    if (toggleResult?.success) {
-      setIsWishlisted(toggleResult.saved);
-      toast.success(toggleResult.message);
-    }
-  }, [toggleResult]);
 
   // Handle errors with useEffect
   useEffect(() => {
-    if (toggleError) {
-      toast.error("Failed to update favorites");
-    }
-  }, [toggleError]);
-
-  // Handle save car
-  const handleSaveCar = async () => {
-    if (!isSignedIn) {
-      toast.error("Please sign in to save cars");
-      router.push("/sign-in");
-      return;
-    }
-
-    if (savingCar) return;
-
-    // Use the toggleSavedCarFn from useFetch hook
-    await toggleSavedCarFn(car.id);
-  };
+    // No errors to handle
+  }, []);
 
   // Handle share
   const handleShare = () => {
@@ -98,23 +63,13 @@ export function CarDetails({ car, testDriveInfo }) {
     toast.success("Link copied to clipboard");
   };
 
-  // Handle book test drive
-  const handleBookTestDrive = () => {
-    if (!isSignedIn) {
-      toast.error("Please sign in to book a test drive");
-      router.push("/sign-in");
-      return;
-    }
-    router.push(`/test-drive/${car.id}`);
-  };
-
   return (
     <div>
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Image Gallery */}
         <div className="w-full lg:w-7/12">
           <div className="aspect-video rounded-lg overflow-hidden relative mb-4">
-            {car.images && car.images.length > 0 ? (
+            {car.images && (car.images ?? []).length > 0 ? (
               <Image
                 src={car.images[currentImageIndex]}
                 alt={`${car.year} ${car.make} ${car.model}`}
@@ -130,9 +85,9 @@ export function CarDetails({ car, testDriveInfo }) {
           </div>
 
           {/* Thumbnails */}
-          {car.images && car.images.length > 1 && (
+          {car.images && (car.images ?? []).length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {car.images.map((image, index) => (
+              {(car.images ?? []).map((image, index) => (
                 <div
                   key={index}
                   className={`relative cursor-pointer rounded-md h-20 w-24 flex-shrink-0 transition ${
@@ -157,19 +112,6 @@ export function CarDetails({ car, testDriveInfo }) {
 
           {/* Secondary Actions */}
           <div className="flex mt-4 gap-4">
-            <Button
-              variant="outline"
-              className={`flex items-center gap-2 flex-1 ${
-                isWishlisted ? "text-red-500" : ""
-              }`}
-              onClick={handleSaveCar}
-              disabled={savingCar}
-            >
-              <Heart
-                className={`h-5 w-5 ${isWishlisted ? "fill-red-500" : ""}`}
-              />
-              {isWishlisted ? "Saved" : "Save"}
-            </Button>
             <Button
               variant="outline"
               className="flex items-center gap-2 flex-1"
@@ -268,22 +210,6 @@ export function CarDetails({ car, testDriveInfo }) {
             </Alert>
           )}
 
-          {/* Book Test Drive Button */}
-          {car.status !== "SOLD" && car.status !== "UNAVAILABLE" && (
-            <Button
-              className="w-full py-6 text-lg"
-              onClick={handleBookTestDrive}
-              disabled={testDriveInfo.userTestDrive}
-            >
-              <Calendar className="mr-2 h-5 w-5" />
-              {testDriveInfo.userTestDrive
-                ? `Booked for ${format(
-                    new Date(testDriveInfo.userTestDrive.bookingDate),
-                    "EEEE, MMMM d, yyyy"
-                  )}`
-                : "Book Test Drive"}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -386,13 +312,13 @@ export function CarDetails({ car, testDriveInfo }) {
               <div>
                 <h4 className="font-medium">Vehiql Motors</h4>
                 <p className="text-gray-600">
-                  {testDriveInfo.dealership?.address || "Not Available"}
+                  123 Main Street, City, State 12345
                 </p>
                 <p className="text-gray-600 mt-1">
-                  Phone: {testDriveInfo.dealership?.phone || "Not Available"}
+                  Phone: +1 (555) 123-4567
                 </p>
                 <p className="text-gray-600">
-                  Email: {testDriveInfo.dealership?.email || "Not Available"}
+                  Email: info@vehiql.com
                 </p>
               </div>
             </div>
@@ -401,59 +327,20 @@ export function CarDetails({ car, testDriveInfo }) {
             <div className="md:w-1/2 lg:w-1/3">
               <h4 className="font-medium mb-2">Working Hours</h4>
               <div className="space-y-2">
-                {testDriveInfo.dealership?.workingHours
-                  ? testDriveInfo.dealership.workingHours
-                      .sort((a, b) => {
-                        const days = [
-                          "MONDAY",
-                          "TUESDAY",
-                          "WEDNESDAY",
-                          "THURSDAY",
-                          "FRIDAY",
-                          "SATURDAY",
-                          "SUNDAY",
-                        ];
-                        return (
-                          days.indexOf(a.dayOfWeek) - days.indexOf(b.dayOfWeek)
-                        );
-                      })
-                      .map((day) => (
-                        <div
-                          key={day.dayOfWeek}
-                          className="flex justify-between text-sm"
-                        >
-                          <span className="text-gray-600">
-                            {day.dayOfWeek.charAt(0) +
-                              day.dayOfWeek.slice(1).toLowerCase()}
-                          </span>
-                          <span>
-                            {day.isOpen
-                              ? `${day.openTime} - ${day.closeTime}`
-                              : "Closed"}
-                          </span>
-                        </div>
-                      ))
-                  : // Default hours if none provided
-                    [
-                      "Monday",
-                      "Tuesday",
-                      "Wednesday",
-                      "Thursday",
-                      "Friday",
-                      "Saturday",
-                      "Sunday",
-                    ].map((day, index) => (
-                      <div key={day} className="flex justify-between text-sm">
-                        <span className="text-gray-600">{day}</span>
-                        <span>
-                          {index < 5
-                            ? "9:00 - 18:00"
-                            : index === 5
-                            ? "10:00 - 16:00"
-                            : "Closed"}
-                        </span>
-                      </div>
-                    ))}
+                {[
+                  { day: "Monday", hours: "9:00 AM - 6:00 PM" },
+                  { day: "Tuesday", hours: "9:00 AM - 6:00 PM" },
+                  { day: "Wednesday", hours: "9:00 AM - 6:00 PM" },
+                  { day: "Thursday", hours: "9:00 AM - 6:00 PM" },
+                  { day: "Friday", hours: "9:00 AM - 6:00 PM" },
+                  { day: "Saturday", hours: "10:00 AM - 4:00 PM" },
+                  { day: "Sunday", hours: "Closed" },
+                ].map((day) => (
+                  <div key={day.day} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{day.day}</span>
+                    <span>{day.hours}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

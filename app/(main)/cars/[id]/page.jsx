@@ -36,7 +36,7 @@ export default async function CarDetailsPage({ params }) {
 
   return (
     <div className="container mx-auto px-4 py-12">
-      <CarDetails car={result.data} testDriveInfo={result.data.testDriveInfo} />
+      <CarDetails car={result.data} />
     </div>
   );
 }

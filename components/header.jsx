@@ -41,21 +41,15 @@ const Header = async ({ isAdminPage = false }) => {
             <SignedIn>
               {!isAdmin && (
                 <Link
-                  href="/reservations"
+                  href="/saved-cars"
                   className="text-gray-600 hover:text-blue-600 flex items-center gap-2"
                 >
                   <Button variant="outline">
-                    <CarFront size={18} />
-                    <span className="hidden md:inline">My Reservations</span>
+                    <Heart size={18} />
+                    <span className="hidden md:inline">Saved Cars</span>
                   </Button>
                 </Link>
               )}
-              <a href="/saved-cars">
-                <Button className="flex items-center gap-2">
-                  <Heart size={18} />
-                  <span className="hidden md:inline">Saved Cars</span>
-                </Button>
-              </a>
               {isAdmin && (
                 <Link href="/admin">
                   <Button variant="outline" className="flex items-center gap-2">

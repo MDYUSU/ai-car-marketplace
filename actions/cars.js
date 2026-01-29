@@ -2,10 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "@/lib/prisma";
+import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 import { serializeCarData } from "@/lib/helpers";
 import cloudinary from "@/lib/cloudinary";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 
 // =====================================================
@@ -37,13 +42,15 @@ export async function addCar({ carData, images }) {
 
     const carId = uuidv4();
 
-    await db.car.create({
-      data: {
+    const { error } = await supabase
+      .from("cars")
+      .insert({
         id: carId,
         ...carData,
         images: validUrls, // Store Cloudinary URLs directly
-      },
-    });
+      });
+
+    if (error) throw error;
 
     revalidatePath("/admin/cars");
 
@@ -59,24 +66,19 @@ export async function addCar({ carData, images }) {
 // =====================================================
 export async function getCars(search = "") {
   try {
-    const where = search
-      ? {
-          OR: [
-            { make: { contains: search, mode: "insensitive" } },
-            { model: { contains: search, mode: "insensitive" } },
-            { color: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : {};
+    let query = supabase.from("cars").select("*");
 
-    const cars = await db.car.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    if (search) {
+      query = query.or(`make.ilike.%${search}%,model.ilike.%${search}%,color.ilike.%${search}%`);
+    }
+
+    const { data, error } = await query.order("createdAt", { ascending: false });
+
+    if (error) throw error;
 
     return {
       success: true,
-      data: cars.map(serializeCarData),
+      data: (data ?? []).map(serializeCarData),
     };
   } catch (error) {
     return { success: false, error: error.message };
@@ -89,15 +91,17 @@ export async function getCars(search = "") {
 // =====================================================
 export async function getCarById(id) {
   try {
-    const car = await db.car.findUnique({
-      where: { id },
-    });
+    const { data, error } = await supabase
+      .from("cars")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-    if (!car) return { success: false, error: "Car not found" };
+    if (error) throw error;
 
     return {
       success: true,
-      data: serializeCarData(car),
+      data: serializeCarData(data),
     };
   } catch (error) {
     return { success: false, error: error.message };
@@ -130,13 +134,17 @@ export async function updateCar(id, { carData, images }) {
       }
     }
 
-    await db.car.update({
-      where: { id },
-      data: {
-        ...carData,
-        ...(validUrls.length > 0 && { images: validUrls }),
-      },
-    });
+    const updateData = {
+      ...carData,
+      ...(validUrls.length > 0 && { images: validUrls }),
+    };
+
+    const { error } = await supabase
+      .from("cars")
+      .update(updateData)
+      .eq("id", id);
+
+    if (error) throw error;
 
     revalidatePath("/admin/cars");
 
@@ -155,15 +163,19 @@ export async function deleteCar(id) {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
-    const car = await db.car.findUnique({
-      where: { id },
-    });
+    // Get car data first to delete images from Cloudinary
+    const { data: car, error: fetchError } = await supabase
+      .from("cars")
+      .select("images")
+      .eq("id", id)
+      .single();
 
+    if (fetchError) throw fetchError;
     if (!car) return { success: false };
 
     // Delete images from Cloudinary
     if (car.images && car.images.length > 0) {
-      const deletePromises = car.images.map(async (imageUrl) => {
+      const deletePromises = (car.images ?? []).map(async (imageUrl) => {
         try {
           // Extract public_id from Cloudinary URL
           // URL format: https://res.cloudinary.com/cloud_name/image/upload/v1234567890/cars/filename.jpg
@@ -194,7 +206,12 @@ export async function deleteCar(id) {
     }
 
     // Delete car from database
-    await db.car.delete({ where: { id } });
+    const { error } = await supabase
+      .from("cars")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
 
     revalidatePath("/admin/cars");
 
@@ -211,10 +228,12 @@ export async function deleteCar(id) {
 // =====================================================
 export async function updateCarStatus(id, { status, featured }) {
   try {
-    await db.car.update({
-      where: { id },
-      data: { status, featured },
-    });
+    const { error } = await supabase
+      .from("cars")
+      .update({ status, featured })
+      .eq("id", id);
+
+    if (error) throw error;
 
     revalidatePath("/admin/cars");
 

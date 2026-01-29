@@ -16,28 +16,28 @@ export const CarFilterControls = ({
     {
       id: "make",
       title: "Make",
-      options: filters.makes.map((make) => ({ value: make, label: make })),
+      options: (filters.makes ?? []).map((make) => ({ value: make, label: make })),
       currentValue: make,
       onChange: (value) => onFilterChange("make", value),
     },
     {
       id: "bodyType",
       title: "Body Type",
-      options: filters.bodyTypes.map((type) => ({ value: type, label: type })),
+      options: (filters.bodyTypes ?? []).map((type) => ({ value: type, label: type })),
       currentValue: bodyType,
       onChange: (value) => onFilterChange("bodyType", value),
     },
     {
       id: "fuelType",
       title: "Fuel Type",
-      options: filters.fuelTypes.map((type) => ({ value: type, label: type })),
+      options: (filters.fuelTypes ?? []).map((type) => ({ value: type, label: type })),
       currentValue: fuelType,
       onChange: (value) => onFilterChange("fuelType", value),
     },
     {
       id: "transmission",
       title: "Transmission",
-      options: filters.transmissions.map((type) => ({
+      options: (filters.transmissions ?? []).map((type) => ({
         value: type,
         label: type,
       })),

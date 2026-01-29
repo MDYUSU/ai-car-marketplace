@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "Vehiql – Car Marketplace",
-  description: "Search, filter and book test drives instantly",
+  description: "Search, filter and find your dream car instantly",
 };
 
 export default function RootLayout({ children }) {

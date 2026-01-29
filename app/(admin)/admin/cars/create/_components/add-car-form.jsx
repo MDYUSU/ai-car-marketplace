@@ -181,7 +181,7 @@ export const AddCarForm = () => {
     const carData = {
       ...data,
       year: parseInt(data.year),
-      price: parseFloat(data.price),
+      price: Number(data.price),
       mileage: parseInt(data.mileage),
       seats: data.seats ? parseInt(data.seats) : null,
     };

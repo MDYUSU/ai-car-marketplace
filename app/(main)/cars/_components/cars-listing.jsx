@@ -132,7 +132,7 @@ export function CarListings() {
   const { data: cars, pagination } = result;
 
   // No results
-  if (cars.length === 0) {
+  if ((cars ?? []).length === 0) {
     return (
       <div className="min-h-[400px] flex flex-col items-center justify-center text-center p-8 border rounded-lg bg-gray-50">
         <div className="bg-gray-100 p-4 rounded-full mb-4">
@@ -238,7 +238,7 @@ export function CarListings() {
 
       {/* Car grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {cars.map((car) => (
+        {(cars ?? []).map((car) => (
           <CarCard key={car.id} car={car} />
         ))}
       </div>
